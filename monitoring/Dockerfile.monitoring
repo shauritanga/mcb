@@ -1,0 +1,17 @@
+FROM python:3.9
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application files
+COPY . .
+
+# Expose ports for Flask API and WebSocket server
+EXPOSE 5000
+EXPOSE 8765
+
+# Start both servers
+CMD ["sh", "-c", "python websocket_server.py & python api.py"]

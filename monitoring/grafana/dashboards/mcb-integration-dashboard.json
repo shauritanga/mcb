@@ -1,0 +1,285 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "MCB Data Integration Dashboard",
+    "tags": ["mcb", "integration", "bot"],
+    "timezone": "Africa/Dar_es_Salaam",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Overview",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "mcb_active_pollers",
+            "legendFormat": "Active Pollers"
+          },
+          {
+            "expr": "mcb_total_endpoints",
+            "legendFormat": "Total Endpoints"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {"displayMode": "list", "orientation": "horizontal"},
+            "mappings": [],
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 80}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Records Processing Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(mcb_records_processed_total[5m])",
+            "legendFormat": "Records/sec - {{endpoint_id}}"
+          }
+        ],
+        "yAxes": [
+          {"label": "Records per second", "min": 0},
+          {"show": false}
+        ],
+        "legend": {"show": true, "values": false, "min": false, "max": false, "current": false, "total": false, "avg": false}
+      },
+      {
+        "id": 3,
+        "title": "Error Rate by Endpoint",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(mcb_records_failed_total[5m])",
+            "legendFormat": "Errors/sec - {{endpoint_id}}"
+          }
+        ],
+        "yAxes": [
+          {"label": "Errors per second", "min": 0},
+          {"show": false}
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [0.1], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "2m",
+          "frequency": "10s",
+          "handler": 1,
+          "name": "High Error Rate",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 4,
+        "title": "Connection Status",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "mcb_endpoint_status",
+            "legendFormat": "{{endpoint_id}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "mappings": [
+              {"options": {"0": {"text": "Unhealthy"}}, "type": "value"},
+              {"options": {"1": {"text": "Healthy"}}, "type": "value"}
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Processing Duration",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(mcb_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile - {{endpoint_id}}"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(mcb_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "50th percentile - {{endpoint_id}}"
+          }
+        ],
+        "yAxes": [
+          {"label": "Duration (seconds)", "min": 0},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Database Connections",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "rate(mcb_connection_attempts_total[5m])",
+            "legendFormat": "Attempts/sec - {{db_type}}"
+          },
+          {
+            "expr": "rate(mcb_connection_failures_total[5m])",
+            "legendFormat": "Failures/sec - {{db_type}}"
+          }
+        ],
+        "yAxes": [
+          {"label": "Connections per second", "min": 0},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Data Validation Errors",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "rate(mcb_validation_errors_total[5m])",
+            "legendFormat": "Validation Errors/sec - {{validation_type}}"
+          },
+          {
+            "expr": "rate(mcb_transformation_errors_total[5m])",
+            "legendFormat": "Transformation Errors/sec - {{transformation_type}}"
+          }
+        ],
+        "yAxes": [
+          {"label": "Errors per second", "min": 0},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 8,
+        "title": "BOT Submissions",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "rate(mcb_bot_submissions_total{status=\"success\"}[5m])",
+            "legendFormat": "Successful Submissions/sec"
+          },
+          {
+            "expr": "rate(mcb_bot_submissions_total{status=\"failure\"}[5m])",
+            "legendFormat": "Failed Submissions/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.01},
+                {"color": "red", "value": 0.1}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Network Latency",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(mcb_network_latency_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile - {{endpoint_id}}"
+          }
+        ],
+        "yAxes": [
+          {"label": "Latency (seconds)", "min": 0},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Top Endpoints by Volume",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40},
+        "targets": [
+          {
+            "expr": "topk(10, rate(mcb_records_processed_total[1h]))",
+            "legendFormat": "{{endpoint_id}} - {{table_name}}",
+            "format": "table"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "endpoint_id": "Endpoint",
+                "table_name": "Table",
+                "Value": "Records/hour"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "endpoint",
+          "type": "query",
+          "query": "label_values(mcb_records_processed_total, endpoint_id)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "table",
+          "type": "query",
+          "query": "label_values(mcb_records_processed_total{endpoint_id=~\"$endpoint\"}, table_name)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "prometheus",
+          "enable": true,
+          "expr": "mcb_integration_info",
+          "iconColor": "blue",
+          "titleFormat": "Deployment"
+        }
+      ]
+    }
+  }
+}

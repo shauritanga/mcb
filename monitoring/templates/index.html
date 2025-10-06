@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCB Data Pipeline Monitor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .status-indicator {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-healthy {
+            background-color: #28a745;
+        }
+        .status-degraded {
+            background-color: #ffc107;
+        }
+        .status-down {
+            background-color: #dc3545;
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .metric-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .table-container {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #refreshTimer {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+        .error-log {
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .error-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-left: 3px solid #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-database-check"></i> MCB Data Pipeline Monitor
+            </a>
+            <div class="d-flex align-items-center">
+                <span id="refreshTimer" class="me-2">Refreshing in 10s</span>
+                <button id="refreshBtn" class="btn btn-sm btn-light">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">System Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <span id="overallStatus" class="status-indicator"></span>
+                                <span id="statusText">Checking...</span>
+                            </div>
+                            <small id="lastUpdated">Last updated: --</small>
+                        </div>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr>
+                                    <td>DB2 Database</td>
+                                    <td><span id="db2Status" class="status-indicator"></span> <span id="db2StatusText">Checking...</span></td>
+                                </tr>
+                                <tr>
+                                    <td>PostgreSQL Database</td>
+                                    <td><span id="pgStatus" class="status-indicator"></span> <span id="pgStatusText">Checking...</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Poller Service</td>
+                                    <td><span id="pollerStatus" class="status-indicator"></span> <span id="pollerStatusText">Checking...</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Recent Errors</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="errorLog" class="error-log p-3">
+                            <div class="text-center py-3">Loading errors...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Polling Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-6 mb-3">
+                                <div class="metric-value" id="personalRecords">0</div>
+                                <div class="metric-label">Personal Data Records</div>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <div class="metric-value" id="assetRecords">0</div>
+                                <div class="metric-label">Asset Records</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="metric-value" id="lastPollTime">--</div>
+                                <div class="metric-label">Last Poll Time</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="metric-value" id="errorRate">0%</div>
+                                <div class="metric-label">Error Rate</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Table Information</h5>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-primary active" id="btnPersonal">Personal Data</button>
+                            <button type="button" class="btn btn-outline-primary" id="btnAsset">Asset Data</button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Column Name</th>
+                                        <th>Data Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableInfo">
+                                    <tr>
+                                        <td colspan="2" class="text-center">Loading table information...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE_URL = '/api';
+        const REFRESH_INTERVAL = 10000; // 10 seconds
+        const WS_URL = 'ws://' + window.location.hostname + ':8765';
+        
+        // State
+        let refreshTimerInterval;
+        let refreshCountdown = 10;
+        let activeTable = 'personal_data_individuals';
+        let socket = null;
+        let cachedTableData = null; // Cache table data for tab switching
+        
+        // DOM Elements
+        const refreshBtn = document.getElementById('refreshBtn');
+        const refreshTimer = document.getElementById('refreshTimer');
+        const btnPersonal = document.getElementById('btnPersonal');
+        const btnAsset = document.getElementById('btnAsset');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initial data load
+            refreshData();
+            
+            // Connect to WebSocket for real-time updates
+            connectWebSocket();
+            
+            // Fallback to timer-based updates
+            startRefreshTimer();
+            
+            // Event listeners
+            refreshBtn.addEventListener('click', () => {
+                refreshData();
+                resetRefreshTimer();
+            });
+            
+            btnPersonal.addEventListener('click', () => {
+                activeTable = 'personal_data_individuals';
+                btnPersonal.classList.add('active');
+                btnAsset.classList.remove('active');
+                if (cachedTableData) {
+                    updateTableInfo(cachedTableData);
+                }
+            });
+            
+            btnAsset.addEventListener('click', () => {
+                activeTable = 'asset_owned_or_acquired';
+                btnAsset.classList.add('active');
+                btnPersonal.classList.remove('active');
+                if (cachedTableData) {
+                    updateTableInfo(cachedTableData);
+                }
+            });
+        });
+        
+        // WebSocket connection
+        function connectWebSocket() {
+            try {
+                socket = new WebSocket(WS_URL);
+                
+                socket.onopen = function(e) {
+                    console.log('WebSocket connection established');
+                    document.getElementById('refreshTimer').textContent = 'Real-time updates active';
+                    clearInterval(refreshTimerInterval);
+                };
+                
+                socket.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    console.log('WebSocket data received:', data);
+                    
+                    // Update UI with real-time data
+                    if (data.status) updateStatusIndicators(data.status);
+                    if (data.polling) updateMetrics(data.polling);
+                    if (data.errors) updateErrorLog(data.errors);
+                };
+                
+                socket.onclose = function(event) {
+                    if (event.wasClean) {
+                        console.log(`WebSocket connection closed cleanly, code=${event.code}, reason=${event.reason}`);
+                    } else {
+                        console.error('WebSocket connection died');
+                    }
+                    
+                    // Fallback to timer-based updates
+                    startRefreshTimer();
+                    
+                    // Try to reconnect after 5 seconds
+                    setTimeout(connectWebSocket, 5000);
+                };
+                
+                socket.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    startRefreshTimer();
+                };
+            } catch (error) {
+                console.error('WebSocket connection error:', error);
+                startRefreshTimer();
+            }
+        }
+        
+        // Functions
+        function startRefreshTimer() {
+            refreshCountdown = 10;
+            refreshTimer.textContent = `Refreshing in ${refreshCountdown}s`;
+            
+            clearInterval(refreshTimerInterval);
+            refreshTimerInterval = setInterval(() => {
+                refreshCountdown--;
+                refreshTimer.textContent = `Refreshing in ${refreshCountdown}s`;
+                
+                if (refreshCountdown <= 0) {
+                    refreshData();
+                    resetRefreshTimer();
+                }
+            }, 1000);
+        }
+        
+        function resetRefreshTimer() {
+            refreshCountdown = 10;
+            refreshTimer.textContent = `Refreshing in ${refreshCountdown}s`;
+        }
+        
+        function refreshData() {
+            fetchStatus();
+            fetchMetrics();
+            fetchTableInfo();
+        }
+        
+        function fetchStatus() {
+            fetch(`${API_BASE_URL}/status`)
+                .then(response => response.json())
+                .then(data => {
+                    updateStatusIndicators(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching status:', error);
+                    setStatusError();
+                });
+        }
+        
+        function fetchMetrics() {
+            fetch(`${API_BASE_URL}/metrics`)
+                .then(response => response.json())
+                .then(data => {
+                    updateMetrics(data);
+                    updateErrorLog(data.errors);
+                })
+                .catch(error => {
+                    console.error('Error fetching metrics:', error);
+                });
+        }
+        
+        function fetchTableInfo() {
+            fetch(`${API_BASE_URL}/tables`)
+                .then(response => response.json())
+                .then(data => {
+                    cachedTableData = data; // Cache the data
+                    updateTableInfo(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching table info:', error);
+                });
+        }
+        
+        function updateStatusIndicators(data) {
+            // Overall status
+            const overallStatus = document.getElementById('overallStatus');
+            const statusText = document.getElementById('statusText');
+            
+            if (data.status === 'healthy') {
+                overallStatus.className = 'status-indicator status-healthy';
+                statusText.textContent = 'All Systems Operational';
+            } else if (data.status === 'degraded') {
+                overallStatus.className = 'status-indicator status-degraded';
+                statusText.textContent = 'Partially Degraded Service';
+            } else {
+                overallStatus.className = 'status-indicator status-down';
+                statusText.textContent = 'System Outage';
+            }
+            
+            // DB2 status
+            const db2Status = document.getElementById('db2Status');
+            const db2StatusText = document.getElementById('db2StatusText');
+            
+            if (data.databases.db2.connected) {
+                db2Status.className = 'status-indicator status-healthy';
+                db2StatusText.textContent = 'Connected';
+            } else {
+                db2Status.className = 'status-indicator status-down';
+                db2StatusText.textContent = 'Disconnected';
+            }
+            
+            // PostgreSQL status
+            const pgStatus = document.getElementById('pgStatus');
+            const pgStatusText = document.getElementById('pgStatusText');
+            
+            if (data.databases.postgresql.connected) {
+                pgStatus.className = 'status-indicator status-healthy';
+                pgStatusText.textContent = 'Connected';
+            } else {
+                pgStatus.className = 'status-indicator status-down';
+                pgStatusText.textContent = 'Disconnected';
+            }
+            
+            // Poller status
+            const pollerStatus = document.getElementById('pollerStatus');
+            const pollerStatusText = document.getElementById('pollerStatusText');
+            
+            if (data.poller.running) {
+                pollerStatus.className = 'status-indicator status-healthy';
+                pollerStatusText.textContent = `Running (Uptime: ${data.poller.uptime})`;
+            } else {
+                pollerStatus.className = 'status-indicator status-down';
+                pollerStatusText.textContent = 'Stopped';
+            }
+            
+            // Last updated
+            document.getElementById('lastUpdated').textContent = `Last updated: ${formatDateTime(data.timestamp)}`;
+        }
+        
+        function updateMetrics(data) {
+            const metrics = data.polling;
+            
+            // Update record counts
+            document.getElementById('personalRecords').textContent = 
+                formatNumber(metrics.records_processed.personal_data_individuals);
+            document.getElementById('assetRecords').textContent = 
+                formatNumber(metrics.records_processed.asset_owned_or_acquired);
+            
+            // Update last poll time
+            if (metrics.last_poll_time) {
+                document.getElementById('lastPollTime').textContent = formatTime(metrics.last_poll_time);
+            } else {
+                document.getElementById('lastPollTime').textContent = '--';
+            }
+            
+            // Update error rate
+            document.getElementById('errorRate').textContent = `${metrics.error_rate || 0}%`;
+        }
+        
+        function updateErrorLog(errors) {
+            const errorLog = document.getElementById('errorLog');
+            
+            if (!errors || errors.length === 0) {
+                errorLog.innerHTML = '<div class="text-center py-3">No recent errors</div>';
+                return;
+            }
+            
+            let html = '';
+            errors.forEach(error => {
+                html += `<div class="error-entry">${error}</div>`;
+            });
+            
+            errorLog.innerHTML = html;
+        }
+        
+        function updateTableInfo(data) {
+            if (!data) return;
+            
+            const tableInfo = document.getElementById('tableInfo');
+            const tableData = data[activeTable];
+            
+            if (!tableData || !tableData.columns) {
+                tableInfo.innerHTML = '<tr><td colspan="2" class="text-center">No table information available</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            tableData.columns.forEach(column => {
+                html += `
+                    <tr>
+                        <td>${column.name}</td>
+                        <td>${column.type}</td>
+                    </tr>
+                `;
+            });
+            
+            tableInfo.innerHTML = html;
+        }
+        
+        function setStatusError() {
+            const overallStatus = document.getElementById('overallStatus');
+            const statusText = document.getElementById('statusText');
+            
+            overallStatus.className = 'status-indicator status-down';
+            statusText.textContent = 'Connection Error';
+            
+            document.getElementById('db2Status').className = 'status-indicator status-down';
+            document.getElementById('db2StatusText').textContent = 'Unknown';
+            
+            document.getElementById('pgStatus').className = 'status-indicator status-down';
+            document.getElementById('pgStatusText').textContent = 'Unknown';
+            
+            document.getElementById('pollerStatus').className = 'status-indicator status-down';
+            document.getElementById('pollerStatusText').textContent = 'Unknown';
+        }
+        
+        // Utility functions
+        function formatNumber(num) {
+            return new Intl.NumberFormat().format(num);
+        }
+        
+        function formatDateTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString();
+        }
+        
+        function formatTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleTimeString();
+        }
+    </script>
+</body>
+</html>

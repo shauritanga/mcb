@@ -1,0 +1,105 @@
+services:
+  db2:
+    image: ibmcom/db2:11.5.8.0
+    hostname: db2
+    container_name: db2
+    privileged: true
+    environment:
+      - DB2INST1_PASSWORD=db2inst1
+      - LICENSE=accept
+      - DBNAME=cbs_db
+      - ARCHIVE_LOGS=false
+      - AUTOCONFIG=false
+    ports:
+      - "50000:50000"
+    volumes:
+      - db2_data:/database/data
+      - ./init_db2.sql:/database/init_db2.sql
+    networks:
+      - bot-network
+    healthcheck:
+      test: ["CMD", "su", "-", "db2inst1", "-c", "db2 connect to cbs_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  postgres:
+    image: postgres:13
+    hostname: postgres
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=bot_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - bot-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bot_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  poller:
+    build:
+      context: ./poller
+      dockerfile: Dockerfile
+    hostname: poller
+    container_name: poller
+    depends_on:
+      db2:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB2_HOST=db2
+      - DB2_PORT=50000
+      - DB2_USER=db2inst1
+      - DB2_PASSWORD=db2inst1
+      - DB2_DBNAME=cbs_db
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=postgres
+      - PG_PASSWORD=postgres
+      - PG_DBNAME=bot_db
+    networks:
+      - bot-network
+      
+  monitoring:
+    build:
+      context: ./monitoring
+      dockerfile: Dockerfile.monitoring
+    container_name: mcb-monitoring
+    ports:
+      - "5000:5000"
+      - "8765:8765"
+    environment:
+      - DB2_HOST=db2
+      - DB2_PORT=50000
+      - DB2_USER=db2inst1
+      - DB2_PASSWORD=db2inst1
+      - DB2_DBNAME=cbs_db
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=postgres
+      - PG_PASSWORD=postgres
+      - PG_DBNAME=bot_db
+    networks:
+      - bot-network
+    depends_on:
+      db2:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+networks:
+  bot-network:
+    driver: bridge
+
+volumes:
+  db2_data:
+  pg_data:

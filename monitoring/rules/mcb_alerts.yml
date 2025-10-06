@@ -1,0 +1,162 @@
+groups:
+- name: mcb_integration_alerts
+  rules:
+  
+  # Application Health Alerts
+  - alert: MCBIntegrationDown
+    expr: up{job="mcb-integration"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "MCB Integration application is down"
+      description: "MCB Integration application has been down for more than 1 minute"
+
+  - alert: HighErrorRate
+    expr: rate(mcb_integration_errors_total[5m]) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High error rate in MCB Integration"
+      description: "Error rate is {{ $value }} errors per second"
+
+  - alert: EndpointPollingFailure
+    expr: mcb_endpoint_last_success_timestamp < (time() - 300)
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Endpoint {{ $labels.endpoint_id }} polling failure"
+      description: "Endpoint {{ $labels.endpoint_id }} has not been successfully polled for more than 5 minutes"
+
+  # Database Alerts
+  - alert: PostgreSQLDown
+    expr: up{job="postgres-primary"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "PostgreSQL primary database is down"
+      description: "PostgreSQL primary database has been down for more than 1 minute"
+
+  - alert: PostgreSQLReplicaDown
+    expr: up{job="postgres-replica"} == 0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "PostgreSQL replica database is down"
+      description: "PostgreSQL replica database has been down for more than 5 minutes"
+
+  - alert: PostgreSQLHighConnections
+    expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "PostgreSQL high connection usage"
+      description: "PostgreSQL is using {{ $value | humanizePercentage }} of available connections"
+
+  - alert: PostgreSQLReplicationLag
+    expr: pg_replication_lag_seconds > 60
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "PostgreSQL replication lag is high"
+      description: "Replication lag is {{ $value }} seconds"
+
+  # Redis Alerts
+  - alert: RedisDown
+    expr: up{job="redis"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis is down"
+      description: "Redis has been down for more than 1 minute"
+
+  - alert: RedisHighMemoryUsage
+    expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis high memory usage"
+      description: "Redis memory usage is {{ $value | humanizePercentage }}"
+
+  # System Resource Alerts
+  - alert: HighCPUUsage
+    expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage on {{ $labels.instance }}"
+      description: "CPU usage is {{ $value }}%"
+
+  - alert: HighMemoryUsage
+    expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage on {{ $labels.instance }}"
+      description: "Memory usage is {{ $value }}%"
+
+  - alert: DiskSpaceLow
+    expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low disk space on {{ $labels.instance }}"
+      description: "Disk usage is {{ $value }}% on {{ $labels.mountpoint }}"
+
+  # Data Processing Alerts
+  - alert: DataProcessingBacklog
+    expr: mcb_processing_queue_size > 1000
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Data processing backlog is high"
+      description: "Processing queue has {{ $value }} items pending"
+
+  - alert: BOTSubmissionFailure
+    expr: rate(mcb_bot_submission_failures_total[5m]) > 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "BOT submission failures detected"
+      description: "BOT submissions are failing at {{ $value }} failures per second"
+
+  - alert: DataValidationErrors
+    expr: rate(mcb_validation_errors_total[5m]) > 0.05
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High data validation error rate"
+      description: "Data validation errors at {{ $value }} errors per second"
+
+  # Network and Connectivity Alerts
+  - alert: DB2ConnectionFailure
+    expr: mcb_db2_connection_failures_total > 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "DB2 connection failures detected"
+      description: "DB2 connections are failing for endpoint {{ $labels.endpoint_id }}"
+
+  - alert: NetworkLatencyHigh
+    expr: mcb_network_latency_seconds > 5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High network latency to {{ $labels.endpoint_id }}"
+      description: "Network latency is {{ $value }} seconds"
