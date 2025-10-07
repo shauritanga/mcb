@@ -145,9 +145,3 @@ docker compose down
 docker volume rm mcb_db2_data  # adjust volume name if different
 docker compose up -d
 ```
-
-## Ideas / next improvements (optional)
-
-- Extract `get_system_resources()` into a small shared module so `api.py` and `websocket_server.py` share a single implementation.
-- Compute network bandwidth (KB/s) by tracking previous counters and exposing deltas.
-- Add an automated verification script that inserts test rows into DB2 and asserts they appear in Postgres.
