@@ -5,163 +5,823 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MCB Data Pipeline Monitor</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@3.35.0/dist/apexcharts.css">
     <style>
+        :root {
+            /* Colors */
+            --primary-color: #0d6efd;
+            --secondary-color: #6c757d;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --light-color: #f8f9fa;
+            --dark-color: #212529;
+            
+            /* Shadows and effects */
+            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+            --transition-speed: 0.3s;
+            
+            /* Spacing system */
+            --space-xs: 8px;
+            --space-sm: 16px;
+            --space-md: 24px;
+            --space-lg: 32px;
+            --space-xl: 48px;
+            
+            /* Border radius */
+            --border-radius-sm: 8px;
+            --border-radius-md: 12px;
+            --border-radius-lg: 16px;
+        }
+        
+        /* Reset and base styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8f9fa;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f0f2f5;
+            color: var(--dark-color);
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
         }
+        
+        /* Layout and spacing */
+        .container-fluid {
+            padding: var(--space-md);
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        .container {
+            padding-left: var(--space-sm);
+            padding-right: var(--space-sm);
+        }
+        
+        /* Simplified responsive grid helpers — use Bootstrap for main layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--space-md);
+            width: 100%;
+            margin-bottom: var(--space-md);
+        }
+
+        /* Small-screen behavior is primarily handled by Bootstrap grid; keep pipeline/table fallbacks */
+        @media (max-width: 768px) {
+            .card {
+                margin-bottom: var(--space-md);
+            }
+
+            .card-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .card-header .btn-group {
+                margin-top: var(--space-xs);
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .data-pipeline {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .pipeline-node {
+                margin-bottom: var(--space-md);
+                width: 100%;
+                max-width: 220px;
+            }
+
+            .pipeline-node:not(:last-child)::after {
+                content: '';
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                width: 2px;
+                height: 30px;
+                background-color: var(--secondary-color);
+                transform: translateX(-50%);
+            }
+
+            .table-container {
+                overflow-x: auto;
+            }
+        }
+        
+        /* Small mobile devices */
+        @media (max-width: 576px) {
+            .container-fluid {
+                padding: var(--space-sm);
+            }
+            
+            .metric-card {
+                padding: 15px;
+            }
+            
+            .metric-value {
+                font-size: 1.5rem;
+            }
+        }
+        
+        /* Auto-fit grid for cards */
+        .auto-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--space-md);
+            width: 100%;
+        }
+        
+        /* Ensure consistent alignment */
+        .container-fluid > .row {
+            margin-top: 0;
+        }
+        
+        /* Navigation */
+        .navbar {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+            background: linear-gradient(135deg, #0d6efd, #0a58ca);
+            margin-bottom: var(--space-md);
+            padding: var(--space-sm);
+        }
+        
         .navbar-brand {
-            font-weight: bold;
+            font-weight: 700;
+            letter-spacing: -0.5px;
         }
+        
+        /* Modern Cards with Glass Morphism */
         .card {
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
-            transition: transform 0.2s;
+            border: none;
+            border-radius: var(--border-radius-md);
+            box-shadow: var(--card-shadow);
+            margin-bottom: var(--space-sm);
+            transition: all var(--transition-speed) ease;
+            overflow: hidden;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
+        
         .card:hover {
             transform: translateY(-5px);
+            box-shadow: 0 15px 25px rgba(0, 0, 0, 0.1);
         }
+        
+        .card-header {
+            background-color: transparent;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            padding: var(--space-sm) var(--space-md);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .card-title {
+            font-weight: 600;
+            margin: 0;
+            color: var(--dark-color);
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .card-title i {
+            margin-right: 8px;
+            color: var(--primary-color);
+        }
+        
+        .card-body {
+            padding: var(--space-md);
+        }
+        
+        /* Card variations */
+        .card-primary {
+            border-top: 4px solid var(--primary-color);
+        }
+        
+        .card-success {
+            border-top: 4px solid var(--success-color);
+        }
+        
+        .card-warning {
+            border-top: 4px solid var(--warning-color);
+        }
+        
+        .card-danger {
+            border-top: 4px solid var(--danger-color);
+        }
+        
+        .section {
+            margin-bottom: var(--space-md);
+        }
+        
+        .section-title {
+            margin-bottom: var(--space-sm);
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+        
+        /* Spacing utilities */
+        .mb-sm {
+            margin-bottom: var(--space-sm);
+        }
+        
+        .mb-md {
+            margin-bottom: var(--space-md);
+        }
+        
+        .mb-lg {
+            margin-bottom: var(--space-lg);
+        }
+        
+        .mt-sm {
+            margin-top: var(--space-sm);
+        }
+        
+        .mt-md {
+            margin-top: var(--space-md);
+        }
+        
+        .p-sm {
+            padding: var(--space-sm);
+        }
+        
+        .p-md {
+            padding: var(--space-md);
+        }
+        
         .status-indicator {
-            width: 15px;
-            height: 15px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 5px;
+            margin-right: 8px;
+            position: relative;
         }
+        
+        .status-indicator.pulse::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            z-index: -1;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+            70% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 0;
+            }
+        }
+        
         .status-healthy {
-            background-color: #28a745;
+            background-color: var(--success-color);
         }
+        
         .status-degraded {
-            background-color: #ffc107;
+            background-color: var(--warning-color);
         }
+        
         .status-down {
-            background-color: #dc3545;
+            background-color: var(--danger-color);
         }
+        
+        .metric-card {
+            padding: 20px;
+            border-radius: var(--border-radius-md);
+            background: linear-gradient(145deg, #ffffff, #f0f0f0);
+            box-shadow: var(--card-shadow);
+            transition: all var(--transition-speed) ease;
+            border-left: 4px solid var(--primary-color);
+            margin-bottom: var(--space-sm);
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .metric-card:nth-child(2) {
+            border-left-color: var(--success-color);
+        }
+        
+        .metric-card:nth-child(3) {
+            border-left-color: var(--warning-color);
+        }
+        
+        .metric-card:nth-child(4) {
+            border-left-color: var(--danger-color);
+        }
+        
         .metric-value {
-            font-size: 2rem;
-            font-weight: bold;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            line-height: 1.2;
         }
+        
         .metric-label {
-            font-size: 0.9rem;
-            color: #6c757d;
+            font-size: 0.85rem;
+            color: var(--secondary-color);
+            font-weight: 500;
         }
+        
         .table-container {
             max-height: 300px;
             overflow-y: auto;
+            border-radius: 0 0 10px 10px;
         }
+        
+        .table {
+            margin-bottom: 0;
+        }
+        
+        .table thead th {
+            background-color: rgba(0, 0, 0, 0.02);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .table td {
+            vertical-align: middle;
+            padding: 12px 16px;
+            font-size: 0.9rem;
+        }
+        
         #refreshTimer {
             font-size: 0.8rem;
-            color: #6c757d;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
         }
+        
+        .btn-refresh {
+            background-color: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            border-radius: 6px;
+            padding: 6px 12px;
+            transition: all 0.2s;
+        }
+        
+        .btn-refresh:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        
         .error-log {
             max-height: 300px;
             overflow-y: auto;
-            font-family: monospace;
+            font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
             font-size: 0.85rem;
             background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
+            padding: 16px;
+            border-radius: 8px;
         }
+        
         .error-entry {
+            margin-bottom: 8px;
+            padding: 10px;
+            border-left: 3px solid var(--danger-color);
+            background-color: rgba(239, 68, 68, 0.05);
+            border-radius: 0 4px 4px 0;
+        }
+        
+        .chart-container {
+            min-height: 250px;
+            width: 100%;
+        }
+        
+        .data-pipeline {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-md) 0;
+            overflow-x: auto;
+            gap: var(--space-xs);
+        }
+        
+        .pipeline-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: var(--card-shadow);
+            min-width: 120px;
+            position: relative;
+        }
+        
+        .pipeline-node:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: -30px;
+            width: 30px;
+            height: 2px;
+            background-color: var(--secondary-color);
+        }
+        
+        .pipeline-icon {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+        
+        .pipeline-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .resource-metric {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .resource-icon {
+            font-size: 20px;
+            margin-right: 15px;
+            color: var(--primary-color);
+        }
+        
+        .resource-info {
+            flex-grow: 1;
+        }
+        
+        .resource-name {
+            font-size: 0.9rem;
+            font-weight: 600;
             margin-bottom: 5px;
-            padding: 5px;
-            border-left: 3px solid #dc3545;
+        }
+        
+        .progress {
+            height: 8px;
+            border-radius: 4px;
+            background-color: rgba(0, 0, 0, 0.05);
+            margin-top: 8px;
+        }
+        
+        .progress-bar {
+            border-radius: 4px;
+        }
+        
+        /* Resource metrics */
+        .resource-metric {
+            margin-bottom: var(--space-sm);
+        }
+        
+        .resource-metric h6 {
+            margin-bottom: var(--space-xs);
+            font-weight: 500;
+        }
+        
+        .resource-metric h4 {
+            margin-bottom: var(--space-xs);
+            font-weight: 600;
+        }
+        
+        /* Original progress bar style */
+        .progress {
+            height: 8px;
+            border-radius: 4px;
+            background-color: rgba(0, 0, 0, 0.05);
+            margin-top: var(--space-xs);
+            margin-bottom: var(--space-md);
+        }
+
+        /* System metrics horizontal bars (full-width) */
+        .system-metrics-bars {
+            margin-top: var(--space-sm);
+            padding-top: var(--space-sm);
+            border-top: 1px dashed rgba(0,0,0,0.04);
+        }
+
+        .system-metrics-bars .metric-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .system-metrics-bars .metric-label {
+            width: 120px;
+            font-weight: 600;
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+        }
+
+        .system-metrics-bars .metric-value {
+            width: 60px;
+            text-align: right;
+            font-weight: 700;
+            color: var(--dark-color);
+        }
+
+        .system-metrics-bars .progress {
+            height: 12px;
+            border-radius: 8px;
+            margin: 0;
+        }
+        
+        .row + .row {
+            margin-top: 0;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .metric-value {
+                font-size: 1.5rem;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .data-pipeline {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .pipeline-node {
+                margin-bottom: 20px;
+                width: 100%;
+            }
+            
+            .pipeline-node:not(:last-child)::after {
+                top: auto;
+                right: 50%;
+                bottom: -20px;
+                width: 2px;
+                height: 20px;
+                transform: translateX(50%);
+            }
         }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
                 <i class="bi bi-database-check"></i> MCB Data Pipeline Monitor
             </a>
             <div class="d-flex align-items-center">
-                <span id="refreshTimer" class="me-2">Refreshing in 10s</span>
-                <button id="refreshBtn" class="btn btn-sm btn-light">
+                <span id="refreshTimer" class="me-3">Refreshing in 10s</span>
+                <button id="refreshBtn" class="btn btn-sm btn-refresh">
                     <i class="bi bi-arrow-clockwise"></i> Refresh
                 </button>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">System Status</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div>
-                                <span id="overallStatus" class="status-indicator"></span>
-                                <span id="statusText">Checking...</span>
-                            </div>
-                            <small id="lastUpdated">Last updated: --</small>
-                        </div>
-                        <table class="table table-sm">
-                            <tbody>
-                                <tr>
-                                    <td>DB2 Database</td>
-                                    <td><span id="db2Status" class="status-indicator"></span> <span id="db2StatusText">Checking...</span></td>
-                                </tr>
-                                <tr>
-                                    <td>PostgreSQL Database</td>
-                                    <td><span id="pgStatus" class="status-indicator"></span> <span id="pgStatusText">Checking...</span></td>
-                                </tr>
-                                <tr>
-                                    <td>Poller Service</td>
-                                    <td><span id="pollerStatus" class="status-indicator"></span> <span id="pollerStatusText">Checking...</span></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Recent Errors</h5>
+    <div class="container-fluid py-4 px-4">
+        <!-- System Overview Row -->
+        <div class="row g-4">
+            <div class="col-12 col-lg-8">
+                <div class="card card-primary h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title">
+                            <i class="bi bi-speedometer2"></i>System Overview
+                        </h5>
+                        <small id="lastUpdated" class="text-muted">Last updated: --</small>
                     </div>
                     <div class="card-body p-0">
-                        <div id="errorLog" class="error-log p-3">
+                        <div class="p-3">
+                            <div class="d-flex align-items-center mb-3">
+                                <span id="overallStatus" class="status-indicator pulse"></span>
+                                <span id="statusText" class="fw-bold">Checking system status...</span>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <tbody>
+                                        <tr>
+                                            <td><i class="bi bi-database me-2"></i>DB2 Database</td>
+                                            <td><span id="db2Status" class="status-indicator"></span> <span id="db2StatusText">Checking...</span></td>
+                                            <td class="text-end"><span id="db2Latency">--</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="bi bi-database me-2"></i>PostgreSQL Database</td>
+                                            <td><span id="pgStatus" class="status-indicator"></span> <span id="pgStatusText">Checking...</span></td>
+                                            <td class="text-end"><span id="pgLatency">--</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="bi bi-cpu me-2"></i>Poller Service</td>
+                                            <td><span id="pollerStatus" class="status-indicator"></span> <span id="pollerStatusText">Checking...</span></td>
+                                            <td class="text-end"><span id="pollerUptime">--</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-12 col-lg-4">
+                <div class="card card-success h-100">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="bi bi-graph-up"></i>Key Metrics
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="auto-grid" style="grid-template-columns: repeat(2, 1fr);">
+                            <div>
+                                <div class="metric-card text-center">
+                                    <div class="metric-value" id="personalRecords">0</div>
+                                    <div class="metric-label">Personal Records</div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="metric-card text-center">
+                                    <div class="metric-value" id="assetRecords">0</div>
+                                    <div class="metric-label">Asset Records</div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="metric-card text-center">
+                                    <div class="metric-value" id="lastPollTime">--</div>
+                                    <div class="metric-label">Last Poll Time</div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="metric-card text-center">
+                                    <div class="metric-value" id="errorRate">0%</div>
+                                    <div class="metric-label">Error Rate</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+        <!-- Resource Monitoring & Historical Data Row -->
+        <div class="row g-4">
+            <div class="col-12 col-lg-4">
+                <div class="card card-primary">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="bi bi-cpu me-2"></i>System Resources
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- New full-width system metrics horizontal bars -->
+                        <div class="system-metrics-bars">
+                            <div class="metric-row">
+                                <div class="metric-label">CPU</div>
+                                <div class="flex-fill">
+                                    <div class="progress">
+                                        <div id="cpuBar" class="progress-bar bg-primary" role="progressbar" style="width:45%" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <div class="metric-value" id="cpuBarValue">45%</div>
+                            </div>
+
+                            <div class="metric-row">
+                                <div class="metric-label">Memory</div>
+                                <div class="flex-fill">
+                                    <div class="progress">
+                                        <div id="memoryBar" class="progress-bar bg-primary" role="progressbar" style="width:32%" aria-valuenow="32" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <div class="metric-value" id="memoryBarValue">32%</div>
+                            </div>
+
+                            <div class="metric-row">
+                                <div class="metric-label">Disk</div>
+                                <div class="flex-fill">
+                                    <div class="progress">
+                                        <div id="diskBar" class="progress-bar bg-primary" role="progressbar" style="width:68%" aria-valuenow="68" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <div class="metric-value" id="diskBarValue">68%</div>
+                            </div>
+
+                            <div class="metric-row">
+                                <div class="metric-label">Network</div>
+                                <div class="flex-fill">
+                                    <div class="progress">
+                                        <div id="networkBar" class="progress-bar bg-primary" role="progressbar" style="width:37%" aria-valuenow="37" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <div class="metric-value" id="networkBarValue">750 KB/s</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-12 col-lg-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title">
+                            <i class="bi bi-graph-up me-2"></i>Historical Data
+                        </h5>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-primary active" id="btnHour">Hour</button>
+                            <button type="button" class="btn btn-outline-primary" id="btnDay">Day</button>
+                            <button type="button" class="btn btn-outline-primary" id="btnWeek">Week</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="historicalChart" class="chart-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Data Pipeline & Error Logs Row -->
+        <div class="row mb-4 top-section" style="margin-top:32px">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="bi bi-diagram-3 me-2"></i>Data Pipeline
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="data-pipeline">
+                            <div class="pipeline-node">
+                                <div class="pipeline-icon">
+                                    <i class="bi bi-database"></i>
+                                </div>
+                                <div class="pipeline-label">DB2 Source</div>
+                                <div class="status-indicator status-healthy mt-2"></div>
+                            </div>
+                            
+                            <div class="pipeline-node">
+                                <div class="pipeline-icon">
+                                    <i class="bi bi-cpu"></i>
+                                </div>
+                                <div class="pipeline-label">Poller Service</div>
+                                <div class="status-indicator status-healthy mt-2"></div>
+                            </div>
+                            
+                            <div class="pipeline-node">
+                                <div class="pipeline-icon">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </div>
+                                <div class="pipeline-label">Transformation</div>
+                                <div class="status-indicator status-healthy mt-2"></div>
+                            </div>
+                            
+                            <div class="pipeline-node">
+                                <div class="pipeline-icon">
+                                    <i class="bi bi-database"></i>
+                                </div>
+                                <div class="pipeline-label">PostgreSQL</div>
+                                <div class="status-indicator status-healthy mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="bi bi-exclamation-triangle me-2"></i>Recent Errors
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="errorLog" class="error-log">
                             <div class="text-center py-3">Loading errors...</div>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Polling Metrics</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row text-center">
-                            <div class="col-6 mb-3">
-                                <div class="metric-value" id="personalRecords">0</div>
-                                <div class="metric-label">Personal Data Records</div>
-                            </div>
-                            <div class="col-6 mb-3">
-                                <div class="metric-value" id="assetRecords">0</div>
-                                <div class="metric-label">Asset Records</div>
-                            </div>
-                            <div class="col-6">
-                                <div class="metric-value" id="lastPollTime">--</div>
-                                <div class="metric-label">Last Poll Time</div>
-                            </div>
-                            <div class="col-6">
-                                <div class="metric-value" id="errorRate">0%</div>
-                                <div class="metric-label">Error Rate</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
+        </div>
+        
+        <!-- Table Information Row -->
+        <div class="row top-section">
+            <div class="col-12">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">Table Information</h5>
+                        <h5 class="card-title">
+                            <i class="bi bi-table me-2"></i>Table Information
+                        </h5>
                         <div class="btn-group btn-group-sm" role="group">
                             <button type="button" class="btn btn-outline-primary active" id="btnPersonal">Personal Data</button>
                             <button type="button" class="btn btn-outline-primary" id="btnAsset">Asset Data</button>
@@ -169,16 +829,17 @@
                     </div>
                     <div class="card-body p-0">
                         <div class="table-container">
-                            <table class="table table-sm table-hover mb-0">
+                            <table class="table table-hover mb-0">
                                 <thead>
                                     <tr>
                                         <th>Column Name</th>
                                         <th>Data Type</th>
+                                        <th>Description</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tableInfo">
                                     <tr>
-                                        <td colspan="2" class="text-center">Loading table information...</td>
+                                        <td colspan="3" class="text-center">Loading table information...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -189,6 +850,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.35.0/dist/apexcharts.min.js"></script>
     <script>
         // Configuration
         const API_BASE_URL = '/api';
@@ -199,19 +861,38 @@
         let refreshTimerInterval;
         let refreshCountdown = 10;
         let activeTable = 'personal_data_individuals';
+        let activeTimeframe = 'hour';
         let socket = null;
         let cachedTableData = null; // Cache table data for tab switching
+        let historicalChart = null;
+        let resourceData = {
+            cpu: { current: 0, history: [] },
+            memory: { current: 0, history: [] },
+            disk: { current: 0, history: [] },
+            network: { current: 0, history: [] }
+        };
+        // Historical time series buffers (real data collected from API/WebSocket)
+        let historicalData = {
+            personal: [], // { x: timestamp(ms), y: value }
+            asset: []
+        };
         
         // DOM Elements
         const refreshBtn = document.getElementById('refreshBtn');
         const refreshTimer = document.getElementById('refreshTimer');
         const btnPersonal = document.getElementById('btnPersonal');
         const btnAsset = document.getElementById('btnAsset');
+        const btnHour = document.getElementById('btnHour');
+        const btnDay = document.getElementById('btnDay');
+        const btnWeek = document.getElementById('btnWeek');
         
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             // Initial data load
             refreshData();
+            
+            // Initialize charts
+            initializeHistoricalChart();
             
             // Connect to WebSocket for real-time updates
             connectWebSocket();
@@ -242,7 +923,290 @@
                     updateTableInfo(cachedTableData);
                 }
             });
+            
+            btnHour.addEventListener('click', () => {
+                activeTimeframe = 'hour';
+                btnHour.classList.add('active');
+                btnDay.classList.remove('active');
+                btnWeek.classList.remove('active');
+                updateHistoricalChart();
+            });
+            
+            btnDay.addEventListener('click', () => {
+                activeTimeframe = 'day';
+                btnDay.classList.add('active');
+                btnHour.classList.remove('active');
+                btnWeek.classList.remove('active');
+                updateHistoricalChart();
+            });
+            
+            btnWeek.addEventListener('click', () => {
+                activeTimeframe = 'week';
+                btnWeek.classList.add('active');
+                btnHour.classList.remove('active');
+                btnDay.classList.remove('active');
+                updateHistoricalChart();
+            });
+            
+            // Initialize system resource data
+            initializeResourceData();
         });
+        
+        // Initialize historical chart (starts empty and will be filled with live data)
+        function initializeHistoricalChart() {
+            const options = {
+                series: [{
+                    name: 'Personal Records',
+                    data: historicalData.personal.length ? historicalData.personal.slice() : generateMockTimeSeriesData(24)
+                }, {
+                    name: 'Asset Records',
+                    data: historicalData.asset.length ? historicalData.asset.slice() : generateMockTimeSeriesData(24)
+                }],
+                chart: {
+                    height: 250,
+                    type: 'area',
+                    toolbar: {
+                        show: false
+                    },
+                    animations: {
+                        enabled: true,
+                        easing: 'easeinout',
+                        speed: 800
+                    },
+                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                },
+                dataLabels: {
+                    enabled: false
+                },
+                stroke: {
+                    curve: 'smooth',
+                    width: 2
+                },
+                fill: {
+                    type: 'gradient',
+                    gradient: {
+                        shadeIntensity: 1,
+                        opacityFrom: 0.7,
+                        opacityTo: 0.3,
+                        stops: [0, 90, 100]
+                    }
+                },
+                xaxis: {
+                    type: 'datetime',
+                    labels: {
+                        datetimeUTC: false
+                    }
+                },
+                yaxis: {
+                    labels: {
+                        formatter: function (val) {
+                            return val.toFixed(0);
+                        }
+                    }
+                },
+                tooltip: {
+                    x: {
+                        format: 'dd MMM yyyy HH:mm'
+                    }
+                },
+                legend: {
+                    position: 'top',
+                    horizontalAlign: 'right'
+                },
+                grid: {
+                    borderColor: '#f1f1f1',
+                    padding: {
+                        bottom: 5
+                    }
+                },
+                colors: ['#0d6efd', '#20c997']
+            };
+
+            historicalChart = new ApexCharts(document.querySelector("#historicalChart"), options);
+            historicalChart.render();
+        }
+        
+        // Generate mock time series data for demo (fallback when no real data yet)
+        function generateMockTimeSeriesData(points) {
+            const data = [];
+            const now = new Date();
+            for (let i = points; i >= 0; i--) {
+                const timestamp = new Date(now);
+                timestamp.setHours(now.getHours() - i);
+                data.push({ x: timestamp.getTime(), y: Math.floor(Math.random() * 500) + 500 });
+            }
+            return data;
+        }
+
+        // Add a new historical data point (called from fetchMetrics or WebSocket)
+        function addHistoricalPoint(pollingMetrics, isoTimestamp) {
+            try {
+                const ts = isoTimestamp ? (new Date(isoTimestamp)).getTime() : Date.now();
+                const personal = (pollingMetrics && pollingMetrics.records_processed && pollingMetrics.records_processed.personal_data_individuals) || 0;
+                const asset = (pollingMetrics && pollingMetrics.records_processed && pollingMetrics.records_processed.asset_owned_or_acquired) || 0;
+
+                historicalData.personal.push({ x: ts, y: Number(personal) });
+                historicalData.asset.push({ x: ts, y: Number(asset) });
+
+                // Keep buffers bounded (7 days worth of hourly-ish points is more than enough)
+                const maxPoints = 7 * 24; // 168
+                if (historicalData.personal.length > maxPoints) historicalData.personal.shift();
+                if (historicalData.asset.length > maxPoints) historicalData.asset.shift();
+
+                // Update chart with the new data
+                if (historicalChart) {
+                    const points = (activeTimeframe === 'week') ? 7 * 24 : 24; // show either 24 or 168
+                    const per = historicalData.personal.slice(-points);
+                    const ast = historicalData.asset.slice(-points);
+                    historicalChart.updateSeries([
+                        { name: 'Personal Records', data: per.length ? per : generateMockTimeSeriesData(points) },
+                        { name: 'Asset Records', data: ast.length ? ast : generateMockTimeSeriesData(points) }
+                    ]);
+                }
+            } catch (e) {
+                console.error('addHistoricalPoint error', e);
+            }
+        }
+        
+        // Update historical chart based on timeframe (uses collected real data if available)
+        function updateHistoricalChart() {
+            let points = 24; // Default
+            if (activeTimeframe === 'day') {
+                points = 24;
+            } else if (activeTimeframe === 'week') {
+                points = 7 * 24;
+            } else {
+                points = 24;
+            }
+
+            const per = historicalData.personal.slice(-points);
+            const ast = historicalData.asset.slice(-points);
+
+            historicalChart.updateSeries([
+                { name: 'Personal Records', data: per.length ? per : generateMockTimeSeriesData(points) },
+                { name: 'Asset Records', data: ast.length ? ast : generateMockTimeSeriesData(points) }
+            ]);
+        }
+        
+        // Initialize system resource data
+        function initializeResourceData() {
+            // Mock data for demo purposes
+            updateResourceMetrics({
+                cpu: Math.floor(Math.random() * 60) + 20,
+                memory: Math.floor(Math.random() * 40) + 30,
+                disk: Math.floor(Math.random() * 30) + 40,
+                network: Math.floor(Math.random() * 1000) + 500
+            });
+            
+            // Update resource metrics every 5 seconds
+            setInterval(() => {
+                updateResourceMetrics({
+                    cpu: Math.min(Math.max(resourceData.cpu.current + (Math.random() * 10 - 5), 5), 95),
+                    memory: Math.min(Math.max(resourceData.memory.current + (Math.random() * 8 - 4), 10), 90),
+                    disk: Math.min(Math.max(resourceData.disk.current + (Math.random() * 2 - 1), 30), 95),
+                    network: Math.min(Math.max(resourceData.network.current + (Math.random() * 200 - 100), 100), 2000)
+                });
+            }, 5000);
+        }
+        
+        // Update resource metrics
+        function updateResourceMetrics(data) {
+            // CPU
+            resourceData.cpu.current = data.cpu;
+            document.getElementById('cpuUsage').textContent = `${Math.round(data.cpu)}%`;
+            document.getElementById('cpuProgress').style.width = `${data.cpu}%`;
+            // Full-width bar
+            const cpuBar = document.getElementById('cpuBar');
+            const cpuBarValue = document.getElementById('cpuBarValue');
+            if (cpuBar) {
+                cpuBar.style.width = `${data.cpu}%`;
+                cpuBar.setAttribute('aria-valuenow', Math.round(data.cpu));
+            }
+            if (cpuBarValue) cpuBarValue.textContent = `${Math.round(data.cpu)}%`;
+            
+            // Memory
+            resourceData.memory.current = data.memory;
+            document.getElementById('memoryUsage').textContent = `${Math.round(data.memory)}%`;
+            document.getElementById('memoryProgress').style.width = `${data.memory}%`;
+            // Full-width bar
+            const memoryBar = document.getElementById('memoryBar');
+            const memoryBarValue = document.getElementById('memoryBarValue');
+            if (memoryBar) {
+                memoryBar.style.width = `${data.memory}%`;
+                memoryBar.setAttribute('aria-valuenow', Math.round(data.memory));
+            }
+            if (memoryBarValue) memoryBarValue.textContent = `${Math.round(data.memory)}%`;
+            
+            // Disk
+            resourceData.disk.current = data.disk;
+            document.getElementById('diskUsage').textContent = `${Math.round(data.disk)}%`;
+            document.getElementById('diskProgress').style.width = `${data.disk}%`;
+            // Full-width bar
+            const diskBar = document.getElementById('diskBar');
+            const diskBarValue = document.getElementById('diskBarValue');
+            if (diskBar) {
+                diskBar.style.width = `${data.disk}%`;
+                diskBar.setAttribute('aria-valuenow', Math.round(data.disk));
+            }
+            if (diskBarValue) diskBarValue.textContent = `${Math.round(data.disk)}%`;
+            
+            // Network
+            resourceData.network.current = data.network;
+            document.getElementById('networkIO').textContent = `${Math.round(data.network)} KB/s`;
+            document.getElementById('networkProgress').style.width = `${Math.min(data.network / 20, 100)}%`;
+            // Full-width bar
+            const networkBar = document.getElementById('networkBar');
+            const networkBarValue = document.getElementById('networkBarValue');
+            if (networkBar) {
+                // Map network KB/s to 0-100% scale for bar (assume 2000 KB/s ~= 100%)
+                const pct = Math.min(Math.round((data.network / 2000) * 100), 100);
+                networkBar.style.width = `${pct}%`;
+                networkBar.setAttribute('aria-valuenow', pct);
+            }
+            if (networkBarValue) networkBarValue.textContent = `${Math.round(data.network)} KB/s`;
+            
+            // Update progress bar colors based on thresholds
+            updateProgressBarColors();
+        }
+        
+        // Update progress bar colors based on thresholds
+        function updateProgressBarColors() {
+            // CPU
+            if (resourceData.cpu.current > 80) {
+                document.getElementById('cpuProgress').className = 'progress-bar bg-danger';
+                if (document.getElementById('cpuBar')) document.getElementById('cpuBar').className = 'progress-bar bg-danger';
+            } else if (resourceData.cpu.current > 60) {
+                document.getElementById('cpuProgress').className = 'progress-bar bg-warning';
+                if (document.getElementById('cpuBar')) document.getElementById('cpuBar').className = 'progress-bar bg-warning';
+            } else {
+                document.getElementById('cpuProgress').className = 'progress-bar bg-primary';
+                if (document.getElementById('cpuBar')) document.getElementById('cpuBar').className = 'progress-bar bg-primary';
+            }
+            
+            // Memory
+            if (resourceData.memory.current > 80) {
+                document.getElementById('memoryProgress').className = 'progress-bar bg-danger';
+                if (document.getElementById('memoryBar')) document.getElementById('memoryBar').className = 'progress-bar bg-danger';
+            } else if (resourceData.memory.current > 60) {
+                document.getElementById('memoryProgress').className = 'progress-bar bg-warning';
+                if (document.getElementById('memoryBar')) document.getElementById('memoryBar').className = 'progress-bar bg-warning';
+            } else {
+                document.getElementById('memoryProgress').className = 'progress-bar bg-primary';
+                if (document.getElementById('memoryBar')) document.getElementById('memoryBar').className = 'progress-bar bg-primary';
+            }
+            
+            // Disk
+            if (resourceData.disk.current > 85) {
+                document.getElementById('diskProgress').className = 'progress-bar bg-danger';
+                if (document.getElementById('diskBar')) document.getElementById('diskBar').className = 'progress-bar bg-danger';
+            } else if (resourceData.disk.current > 70) {
+                document.getElementById('diskProgress').className = 'progress-bar bg-warning';
+                if (document.getElementById('diskBar')) document.getElementById('diskBar').className = 'progress-bar bg-warning';
+            } else {
+                document.getElementById('diskProgress').className = 'progress-bar bg-primary';
+                if (document.getElementById('diskBar')) document.getElementById('diskBar').className = 'progress-bar bg-primary';
+            }
+        }
         
         // WebSocket connection
         function connectWebSocket() {
@@ -261,8 +1225,12 @@
                     
                     // Update UI with real-time data
                     if (data.status) updateStatusIndicators(data.status);
-                    if (data.polling) updateMetrics(data.polling);
+                    if (data.polling) {
+                        updateMetrics(data.polling);
+                        addHistoricalPoint(data.polling, data.timestamp || data.polling.last_poll_time);
+                    }
                     if (data.errors) updateErrorLog(data.errors);
+                    if (data.resources) updateResourceMetrics(data.resources);
                 };
                 
                 socket.onclose = function(event) {
@@ -335,6 +1303,8 @@
                 .then(data => {
                     updateMetrics(data);
                     updateErrorLog(data.errors);
+                    // Add a historical point from API metrics
+                    if (data && data.polling) addHistoricalPoint(data.polling, data.timestamp || data.polling.last_poll_time);
                 })
                 .catch(error => {
                     console.error('Error fetching metrics:', error);
@@ -410,7 +1380,9 @@
         }
         
         function updateMetrics(data) {
-            const metrics = data.polling;
+            // Accept either the full API response (with .polling) or the polling object itself
+            const metrics = (data && data.polling) ? data.polling : data;
+            if (!metrics) return;
             
             // Update record counts
             document.getElementById('personalRecords').textContent = 
