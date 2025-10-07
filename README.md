@@ -1,351 +1,153 @@
-# MCB Real-Time Data Integration System
+# MCB Real-Time Data Integration — local demo
 
-A production-ready, scalable real-time data integration system for Mauritius Commercial Bank (MCB) that extracts data from IBM DB2 core banking systems and replicates it to PostgreSQL for Bank of Tanzania (BOT) regulatory reporting.
+This repository is a compact, reproducible demo of a real-time data integration pipeline that reads source data from an IBM DB2 schema and replicates it to PostgreSQL. It also includes a small monitoring service (Flask + WebSocket) and a single-page dashboard to visualize processing counts, recent logs and system resource snapshots.
 
-## 🏗️ Architecture Overview
+This README focuses on how to run the repository locally (Docker Compose), how to initialize DB2, how to verify replicated data, and where to find the monitoring UI and APIs.
 
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   IBM DB2       │    │  Data Integration │    │   PostgreSQL    │
-│ Core Banking    │───▶│     Engine        │───▶│   BOT Database  │
-│   Systems       │    │                  │    │                 │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                       ┌──────────────────┐
-                       │   Monitoring &   │
-                       │   Health Checks  │
-                       └──────────────────┘
-```
+## What is in this repo
 
-## 🚀 Key Features
+- `docker-compose.yml` — Compose file that defines four services: `db2`, `postgres`, `poller`, and `monitoring`.
+- `create_db2_tables.sql` — DB2 DDL (schema + tables + sample INSERT) used to seed DB2.
+- `init_db2.sql` — init script mounted into the DB2 container (used on first run).
+- `poller/` — poller application that reads DB2 and writes to Postgres (image built from `poller/Dockerfile`).
+- `monitoring/` — Flask API (`api.py`), WebSocket server (`websocket_server.py`), templates and static UI files.
 
-- **Real-time Data Streaming**: Timestamp-based incremental sync with 5-30 second polling intervals
-- **Scalable Architecture**: Supports 90+ banking endpoints with async/concurrent processing
-- **Production Ready**: Docker containerization with monitoring, health checks, and alerting
-- **Data Transformation**: Comprehensive data validation, transformation, and error handling
-- **High Availability**: PostgreSQL replication, Redis clustering, and automatic failover
-- **Monitoring**: Prometheus metrics, Grafana dashboards, and comprehensive alerting
+## Quickstart (recommended)
 
-## 📋 System Requirements
+Requirements
 
-### Minimum Requirements
-- **CPU**: 4 cores
-- **RAM**: 8 GB
-- **Storage**: 100 GB SSD
-- **Network**: 1 Gbps
+- Docker and Docker Compose (v2) available on your machine.
 
-### Recommended for 90+ Endpoints
-- **CPU**: 8-16 cores
-- **RAM**: 16-32 GB
-- **Storage**: 500 GB SSD with high IOPS
-- **Network**: 10 Gbps
-
-## 🛠️ Installation & Setup
-
-### 1. Prerequisites
+Start the entire stack:
 
 ```bash
-# Install Docker and Docker Compose
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
+docker compose up -d --build
 ```
 
-### 2. Environment Configuration
+This builds the `monitoring` and `poller` images and starts the `db2`, `postgres`, `poller`, and `monitoring` services.
+
+Wait for health checks
+
+DB2 can take some time to initialize. Check service status with:
 
 ```bash
-# Copy environment template
-cp .env.example .env
+docker compose ps
 
-# Edit environment variables
-nano .env
+docker logs db2 --tail 200
 ```
 
-Required environment variables:
-```bash
-# PostgreSQL Configuration
-PG_BOT_PASSWORD=your_secure_password
-PG_REPLICATION_PASSWORD=your_replication_password
+If DB2 was started previously with a persistent volume the `init_db2.sql` may not be re-applied automatically (see DB2 init section below).
 
-# Monitoring
-GRAFANA_PASSWORD=your_grafana_password
-RABBITMQ_PASSWORD=your_rabbitmq_password
+Open the monitoring UI
 
-# Optional: Cloud backup
-AWS_ACCESS_KEY=your_aws_key
-AWS_SECRET_KEY=your_aws_secret
-```
+- Dashboard (Flask): http://localhost:5000
+- WebSocket (used by the dashboard): ws://localhost:8765
 
-### 3. Configuration Setup
+The UI shows processed-record counts (from Postgres), a small recent log view, and system resource bars (CPU, memory, disk, network cumulative bytes).
+
+## DB2 initialization and sample data
+
+The SQL to create `CBS_SCHEMA` and the two sample tables is in `create_db2_tables.sql`. The file `init_db2.sql` is mounted into the DB2 container so the container can run it at first boot. If your DB2 container already has a persistent volume, the init script will not re-run.
+
+To manually apply the schema inside the DB2 container:
 
 ```bash
-# Generate additional endpoints (optional)
-python scripts/generate_endpoints.py
+# copy init SQL into container
+docker cp create_db2_tables.sql db2:/tmp/init.sql
 
-# Validate configuration
-python -c "from config.endpoint_manager import EndpointConfigManager; print('✓ Config valid' if EndpointConfigManager().load_configuration() else '✗ Config invalid')"
+# run the SQL as the DB2 instance owner
+docker exec -it db2 bash -lc "su - db2inst1 -c \"db2 connect to cbs_db && db2 -tvf /tmp/init.sql\""
 ```
 
-### 4. Production Deployment
+To insert a test row (example):
 
 ```bash
-# Build and start all services
-docker-compose -f docker-compose.production.yml up -d
-
-# Check service health
-docker-compose -f docker-compose.production.yml ps
-
-# View logs
-docker-compose -f docker-compose.production.yml logs -f mcb-integration-app
+docker exec -it db2 bash -lc "su - db2inst1 -c \"db2 connect to cbs_db && db2 \"INSERT INTO CBS_SCHEMA.PERSONAL_DATA_INDIVIDUALS (REPORTINGDATE, CUSTOMERIDENTIFICATIONNUMBER, FIRSTNAME, SURNAME, CREATEDDATE) VALUES ('07102025','TEST-001','Jane','Doe', CURRENT TIMESTAMP)\"\""
 ```
 
-## 📊 Monitoring & Health Checks
+Note: the DB2 commands above run inside the container and assume the default `db2inst1` account (as configured in `docker-compose.yml`).
 
-### Health Check Endpoints
+## Verify DB2 → Postgres replication
 
-- **Simple Health**: `http://localhost/health/simple`
-- **Detailed Health**: `http://localhost/health`
-- **System Status**: `http://localhost/status`
-- **Endpoint Status**: `http://localhost/endpoints/{endpoint_id}/status`
-
-### Monitoring Dashboards
-
-- **Grafana**: `http://localhost:3000` (admin/your_grafana_password)
-- **Prometheus**: `http://localhost:9090`
-- **Kibana**: `http://localhost:5601`
-- **RabbitMQ**: `http://localhost:15672`
-
-### Key Metrics
-
-- **Records Processing Rate**: Records processed per second by endpoint
-- **Error Rates**: Failed records and connection failures
-- **Processing Duration**: 95th percentile processing times
-- **System Health**: Endpoint availability and connection status
-
-## 🔧 Configuration
-
-### Endpoint Configuration
-
-Endpoints are configured in `config/endpoints.yaml`:
-
-```yaml
-endpoints:
-  - id: "hq_dar_es_salaam"
-    name: "MCB Headquarters - Dar es Salaam"
-    db_type: "db2"
-    connection:
-      host: "db2-hq.mcb.co.tz"
-      port: 50000
-      database: "cbs_db"
-      user: "db2inst1"
-      password: "${DB2_HQ_PASSWORD}"
-    tables:
-      - "PERSONAL_DATA_INDIVIDUALS"
-      - "ASSET_OWNED_OR_ACQUIRED"
-    poll_interval: 15
-    batch_size: 2000
-    priority: "critical"
-    enabled: true
-```
-
-### Supported Database Types
-
-- **IBM DB2**: Primary core banking systems
-- **PostgreSQL**: Mobile banking and digital systems
-- **MySQL**: ATM networks and branch systems
-- **Oracle**: Legacy core banking systems
-- **REST API**: External system integrations
-
-## 🧪 Testing
-
-### Unit Tests
+1. Tail the poller logs to ensure it's running and processing:
 
 ```bash
-# Run all unit tests
-python -m pytest tests/ -v
-
-# Run specific test file
-python -m pytest tests/test_data_integration_engine.py -v
-
-# Run with coverage
-python -m pytest tests/ --cov=. --cov-report=html
+docker logs poller -f --tail 200
 ```
 
-### Integration Tests
+2. Query Postgres to see replicated rows:
 
 ```bash
-# Set up test database
-export TEST_PG_HOST=localhost
-export TEST_PG_DATABASE=test_bot_db
-
-# Run integration tests
-python -m pytest tests/test_integration.py -v -m integration
+docker exec -it postgres psql -U postgres -d bot_db -c "SELECT COUNT(*) FROM bot_personal_data_individuals;"
 ```
 
-### Performance Tests
+If counts are not changing, check `poller` logs for errors and confirm DB2 connectivity.
+
+## Monitoring service (how it works)
+
+- REST endpoint: `GET /api/metrics` (http://localhost:5000/api/metrics)
+
+  - Returns JSON with keys: `polling` (records counts), `errors` (recent log messages), `resources` (system snapshot), `timestamp`.
+
+- WebSocket server: ws://localhost:8765
+  - Broadcasts the same JSON payload to connected clients every few seconds.
+
+If the dashboard shows demo/static values:
 
 ```bash
-# Load test with 90+ endpoints
-python tests/performance/load_test.py --endpoints=90 --duration=300
+curl http://localhost:5000/api/metrics | jq
+docker logs mcb-monitoring -f --tail 200
 ```
 
-## 📈 Performance Tuning
+## Development notes & design decisions
 
-### Database Optimization
+- `monitoring/Dockerfile.monitoring` installs Python dependencies from `monitoring/requirements.txt` and starts both `websocket_server.py` and `api.py` in the same container for simplicity.
+- System resources are sampled using `psutil` and are returned as a small snapshot (cpu_percent, memory_percent, disk_percent, network_bytes_total). The UI shows cumulative network bytes; bandwidth (bytes/sec) requires sampling deltas across time.
+- The `poller` service is intentionally simple — it demonstrates the DB2→Postgres flow and the monitoring integration.
 
-```sql
--- PostgreSQL tuning for high-throughput writes
-ALTER SYSTEM SET shared_buffers = '4GB';
-ALTER SYSTEM SET effective_cache_size = '12GB';
-ALTER SYSTEM SET maintenance_work_mem = '1GB';
-ALTER SYSTEM SET checkpoint_completion_target = 0.9;
-ALTER SYSTEM SET wal_buffers = '64MB';
-ALTER SYSTEM SET default_statistics_target = 100;
-```
+## Useful commands
 
-### Application Tuning
-
-```python
-# Adjust concurrency settings in main.py
-MAX_CONCURRENT_ENDPOINTS = 30  # Adjust based on system capacity
-WORKER_THREADS = 20           # Thread pool size
-BATCH_SIZE = 1000            # Records per batch
-POLL_INTERVAL = 30           # Seconds between polls
-```
-
-## 🔒 Security
-
-### Database Security
-
-- Use strong passwords for all database connections
-- Enable SSL/TLS for database connections
-- Implement row-level security (RLS) policies
-- Regular security audits and updates
-
-### Network Security
-
-- Use VPN or private networks for database connections
-- Implement firewall rules to restrict access
-- Enable connection encryption
-- Monitor for suspicious activity
-
-### Data Privacy
-
-- Anonymize sensitive fields in transformation rules
-- Implement data retention policies
-- Audit data access and modifications
-- Comply with data protection regulations
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-#### 1. DB2 Connection Failures
+- Start / stop / rebuild the stack
 
 ```bash
-# Check DB2 connectivity
-docker exec -it mcb-integration-app python -c "
-import ibm_db
-try:
-    conn = ibm_db.connect('DATABASE=cbs_db;HOSTNAME=db2-host;PORT=50000;PROTOCOL=TCPIP;UID=user;PWD=pass;', '', '')
-    print('✓ DB2 connection successful')
-    ibm_db.close(conn)
-except Exception as e:
-    print(f'✗ DB2 connection failed: {e}')
-"
+docker compose up -d --build
+docker compose down
+docker compose build monitoring
 ```
 
-#### 2. High Memory Usage
+- Tail logs
 
 ```bash
-# Monitor memory usage
-docker stats mcb-integration-app
-
-# Adjust memory limits in docker-compose.production.yml
-deploy:
-  resources:
-    limits:
-      memory: 8G
+docker logs -f poller --tail 200
+docker logs -f mcb-monitoring --tail 200
 ```
 
-#### 3. Processing Delays
+- Inspect containers
 
 ```bash
-# Check processing queue
-curl http://localhost/metrics/summary | jq '.processing_queue_size'
-
-# Increase concurrent pollers
-# Edit main.py: MAX_CONCURRENT_ENDPOINTS = 50
+docker compose ps
+docker exec -it postgres psql -U postgres -d bot_db -c "\dt"
 ```
 
-### Log Analysis
+## Troubleshooting
+
+- Missing Python packages inside `monitoring` container:
 
 ```bash
-# View application logs
-docker logs mcb-integration-app -f
-
-# Search for errors
-docker logs mcb-integration-app 2>&1 | grep ERROR
-
-# View specific endpoint logs
-docker logs mcb-integration-app 2>&1 | grep "endpoint_id=hq_dar_es_salaam"
+docker compose build monitoring
+docker compose up -d monitoring
 ```
 
-## 📚 API Documentation
-
-### Health Check API
+- DB2 init script not applied: either apply manually (see DB2 init section) or recreate DB2 with a fresh volume:
 
 ```bash
-# Simple health check
-curl http://localhost/health/simple
-
-# Detailed health check
-curl http://localhost/health
-
-# System status
-curl http://localhost/status
-
-# Endpoint-specific status
-curl http://localhost/endpoints/hq_dar_es_salaam/status
+docker compose down
+docker volume rm mcb_db2_data  # adjust volume name if different
+docker compose up -d
 ```
 
-### Admin Operations
+## Ideas / next improvements (optional)
 
-```bash
-# Restart specific endpoint
-curl -X POST http://localhost/admin/restart-endpoint/hq_dar_es_salaam
-
-# Get recent logs
-curl http://localhost/admin/logs/100
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 Support
-
-For support and questions:
-
-- **Email**: support@mcb.co.tz
-- **Documentation**: [Internal Wiki](https://wiki.mcb.co.tz/data-integration)
-- **Issue Tracker**: [GitHub Issues](https://github.com/mcb/data-integration/issues)
-
-## 🔄 Version History
-
-- **v1.0.0** - Initial production release
-- **v1.1.0** - Added support for 90+ endpoints
-- **v1.2.0** - Enhanced monitoring and alerting
-- **v1.3.0** - Performance optimizations and security improvements
+- Extract `get_system_resources()` into a small shared module so `api.py` and `websocket_server.py` share a single implementation.
+- Compute network bandwidth (KB/s) by tracking previous counters and exposing deltas.
+- Add an automated verification script that inserts test rows into DB2 and asserts they appear in Postgres.
